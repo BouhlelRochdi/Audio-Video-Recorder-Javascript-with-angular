@@ -1,5 +1,10 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-
+import { BehaviorSubject } from 'rxjs';
+export enum accessPermission {
+  DENIED = 'denied',
+  PROMPT = 'prompt',
+  GRANTED = 'granted'
+}
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -8,19 +13,20 @@ import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 export class AppComponent implements OnInit {
   // To swith from using vanilla JS to recorderRtc library follow this link
   // https://stackblitz.com/edit/angular-audio-recorder?file=src%2Fapp%2Fapp.component.html,src%2Fapp%2Fapp.component.ts,package.json,src%2Fapp%2Faudio-recording.service.ts
-  
+
   title = 'projectTest';
   @ViewChild('recordedSound') recordedSound!: ElementRef;
   @ViewChild('sound') sound!: ElementRef;
 
   videoElement!: HTMLAudioElement;
-  // recordSound!: HTMLVideoElement;
-  recordSound!: HTMLAudioElement;
+  recordSound!: HTMLVideoElement;
+  // recordSound!: HTMLAudioElement;
   mediaRecorder!: any;
   recordedBlobs: Blob[] = [];
   isRecording: boolean = false;
   downloadUrl!: string;
-  stream!: MediaStream;
+  stream!: MediaStream | null;
+  streamed!: MediaStream;
   hidden: boolean = true;
 
   // counter
@@ -28,60 +34,85 @@ export class AppComponent implements OnInit {
   display!: any;
   interval!: any;
 
+  // Permissions navigator
+  accessPermission!: BehaviorSubject<PermissionStatus>;
+
   constructor() { }
 
   async ngOnInit() {
+
   }
 
   async startRecording() {
-    this.hidden = true;
-    let options: any = { mimeType: 'audio/webm' };
-
-
-    let stream = await navigator.mediaDevices
-      .getUserMedia({
-        audio: true,
-        video: false,
-      });
-    this.videoElement = this.sound.nativeElement;
-    this.recordSound = this.recordedSound.nativeElement;
-
-    this.stream = stream;
-    this.videoElement.srcObject = this.stream;
+    this.accessPermission = new BehaviorSubject(await navigator.permissions.query({ name: 'microphone' } as unknown as any))
     try {
-      this.startTimer();
-      this.mediaRecorder = await new MediaRecorder(this.stream, options)
-    } catch (err) {
-      console.log(err);
+      if(this.accessPermission.value.state == accessPermission.DENIED) 
+      alert('you need to reset the permissions manually in order to use the recorder!')
+    if (this.accessPermission.value.state == accessPermission.PROMPT || this.accessPermission.value.state == undefined) {
+      this.streamed = await navigator.mediaDevices
+        .getUserMedia({
+          audio: true,
+          video: false,
+        });
+      return
     }
+    else {
+      this.hidden = true;
+      let options: any = { mimeType: 'audio/webm' };
+      this.streamed = await navigator.mediaDevices
+        .getUserMedia({
+          audio: true,
+          video: false,
+        });
+      this.videoElement = this.sound.nativeElement;
+      this.recordSound = this.recordedSound.nativeElement;
 
-    this.mediaRecorder.start();
+      this.stream = this.streamed;
+      this.videoElement.srcObject = this.stream;
+      try {
+        this.mediaRecorder = new MediaRecorder(this.streamed, options)
+      } catch (err) {
+        console.log(err);
+      }
+      this.mediaRecorder.start();
+      this.startTimer();
 
-    this.isRecording = !this.isRecording;
-    await this.onDataAvailableEvent();
-    await this.onStopRecordingEvent();
+      this.isRecording = !this.isRecording;
+      await this.onDataAvailableEvent();
+      await this.onStopRecordingEvent();
+    }
+      
+    } catch (error) {
+      console.log(error)
+    }
   }
 
   stopRecording() {
-    this.mediaRecorder.stop();
-    this.isRecording = !this.isRecording;
-    this.hidden = false;
-  }
-
-  playRecording() {
-    if (!this.recordedBlobs || !this.recordedBlobs.length) {
-      alert('cannot play.');
-      return;
-    }
-    this.recordSound.play();
+    if (this.isRecording) {
+      this.stopTimer()
+      this.mediaRecorder.stop();
+      this.isRecording = !this.isRecording;
+      this.hidden = false;
+    } else return;
   }
 
   async onDataAvailableEvent() {
     try {
       this.mediaRecorder.ondataavailable = (event: any) => {
-        if (event.data && event.data.size > 0) {
-          this.recordedBlobs.push(event.data);
-        }
+        if (event.data.size < 8000) {
+          console.log('event on data aivailable < 8000 :', event)
+
+          this.stopTimer();
+          this.recordedBlobs = [];
+          this.hidden = true;
+          console.log('hidden: ', this.hidden);
+          console.log('Too low Data to save');
+
+          // alert('Too low Data to save');
+        } else
+          if (event.data) {
+            this.recordedBlobs.push(event.data);
+          }
       }
     } catch (error) {
       console.log(error);
@@ -91,17 +122,30 @@ export class AppComponent implements OnInit {
   async onStopRecordingEvent() {
     try {
       this.mediaRecorder.onstop = async (event: Event) => {
-        const videoBuffer = await new Blob(this.recordedBlobs, {
-          // type: 'video/webm'
-          type: 'audio/webm'
-        });
-        this.downloadUrl = await window.URL.createObjectURL(videoBuffer); // you can download with <a> tag
-        this.recordSound.src = this.downloadUrl;
-        this.pauseTimer()
+        this.stopTimer();
+        this.stopStreaming();
+        if (this.recordedBlobs.length <= 0) {
+          return;
+        } else {
+          const videoBuffer = new Blob(this.recordedBlobs, {
+            // type: 'video/webm'
+            type: 'audio/webm'
+          });
+          this.downloadUrl = window.URL.createObjectURL(videoBuffer); // you can download with <a> tag
+          this.recordSound.src = this.downloadUrl;
+        }
       };
     } catch (error) {
       console.log(error);
     }
+  }
+
+  stopStreaming() {
+    let audioTrack = this.stream?.getAudioTracks()
+    audioTrack?.forEach(element => {
+      element.stop()
+    });
+    this.stream = null
   }
 
   startTimer() {
@@ -116,16 +160,18 @@ export class AppComponent implements OnInit {
   }
 
   transform(value: any): string {
-    console.log('value: ', value)
+    console.log('timer: ', value)
     let minutes: any = Math.floor(value / 60);
-    value  = value - minutes * 60;
-    if(minutes <10) minutes = '0'+ minutes;
-    if(value < 10) value = '0'+ value 
+    value = value - minutes * 60;
+    if (minutes < 10) minutes = '0' + minutes;
+    if (value < 10) value = '0' + value
     return minutes + ':' + value;
   }
 
-  pauseTimer() {
+  stopTimer() {
     clearInterval(this.interval);
+    this.time = 0;
+    this.display = null;
   }
 }
 
