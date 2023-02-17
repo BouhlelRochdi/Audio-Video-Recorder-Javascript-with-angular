@@ -1,15 +1,18 @@
-import { Component, EventEmitter, NgZone, Output } from '@angular/core';
+import { Component, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { OnInit } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { ViewChild } from '@angular/core';
 import { ElementRef } from '@angular/core';
 import { accessPermission } from '../enum/access.recorder.enum';
+import { RecorderService } from '../services/recorder.service';
+import { HttpClientModule } from '@angular/common/http';
 
 @Component({
   selector: 'lib-recorder',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, HttpClientModule],
+  providers: [RecorderService],
   templateUrl: './recorder.component.html',
   styleUrls: ['./recorder.component.css']
 })
@@ -37,7 +40,10 @@ export class RecorderComponent implements OnInit {
   // Permissions navigator
   accessPermission!: BehaviorSubject<PermissionStatus>;
 
-  constructor(private ngzone: NgZone) { }
+  constructor(
+    private ngzone: NgZone,
+    private recorderService: RecorderService
+  ) { }
 
   async ngOnInit() {
 
@@ -114,8 +120,6 @@ export class RecorderComponent implements OnInit {
       this.mediaRecorder.ondataavailable = (event: any) => {
         if (event.data.size < 8000) {
           this.stopTimer();
-          // this.recordedBlobs = [];
-          // this.hidden = true;
           this.ngzone.run(() => {
             this.hidden = true;
             this.recordedBlobs = [];
@@ -187,9 +191,9 @@ export class RecorderComponent implements OnInit {
     this.display = null;
   }
 
-
-  log() {
-    console.log(this.hidden);
-
+  sendRecord(){
+    let formData: FormData = new FormData();
+    formData.append('voice', this.recordedBlobs[0])
+    this.recorderService.sendVoiceRecord(formData)
   }
 }
