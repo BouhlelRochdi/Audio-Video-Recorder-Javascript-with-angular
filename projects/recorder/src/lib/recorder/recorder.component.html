@@ -23,7 +23,7 @@
 
   <video class="video" controls #sound [hidden]="true"></video>
   <audio class="video" controls #recordedSound [hidden]="hidden"></audio>
-  <button *ngIf="recordedBlobs.length > 0" (click)="sendRecord()">send record</button>
+  <button *ngIf="!empty && !hidden" (click)="sendRecord()">send record</button>
 
 
   <!-- <svg id="clouds" style="position: relative;" xmlns="http://www.w3.org/2000/svg" width="100%" height="485.677" viewBox="0 0 2611.084 485.677">

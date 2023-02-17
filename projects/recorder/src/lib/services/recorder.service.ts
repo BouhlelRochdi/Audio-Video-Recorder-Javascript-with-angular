@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { catchError, throwError } from 'rxjs';
+import { catchError, Observable, throwError } from 'rxjs';
 
 @Injectable({
     providedIn: 'root'
@@ -9,9 +9,9 @@ export class RecorderService {
 
     constructor(private httpClient: HttpClient) { }
 
-    sendVoiceRecord(record: FormData) {
+    sendVoiceRecord(record: FormData): Observable<any> {
         console.log('formData arrived: ', record.get('voice'))
-        this.httpClient.post('/api/post-record', record).pipe(
+        return this.httpClient.post<any>('http://localhost:3010/effects', record).pipe(
             catchError((error) => this.handleError(error))
         );
     }

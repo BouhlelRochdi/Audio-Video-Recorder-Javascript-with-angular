@@ -32,6 +32,8 @@ export class RecorderComponent implements OnInit {
   streamed!: MediaStream | null;
   hidden: boolean = true;
 
+  empty: boolean = true
+
   // counter
   time: number = 0;
   display!: string | null;
@@ -58,13 +60,11 @@ export class RecorderComponent implements OnInit {
         alert('you need to reset the permissions manually in order to use the recorder!')
       if (this.accessPermission.value.state == accessPermission.PROMPT || this.accessPermission.value.state == undefined) {
         console.log('!! access prompt !!');
-
         this.streamed = await navigator.mediaDevices
           .getUserMedia({
             audio: true,
             video: false,
           });
-        return
       }
       else {
         console.log('!! we are in !!');
@@ -85,8 +85,8 @@ export class RecorderComponent implements OnInit {
         } catch (err) {
           console.log(err);
         }
-        this.mediaRecorder.start();
         this.startTimer();
+        this.mediaRecorder.start();
 
         this.isRecording = !this.isRecording;
         await this.onDataAvailableEvent();
@@ -112,7 +112,8 @@ export class RecorderComponent implements OnInit {
       this.mediaRecorder.stop();
       this.isRecording = !this.isRecording;
       this.hidden = false;
-    } else return;
+      this.empty = false;
+    }
   }
 
   async onDataAvailableEvent() {
@@ -122,6 +123,7 @@ export class RecorderComponent implements OnInit {
           this.stopTimer();
           this.ngzone.run(() => {
             this.hidden = true;
+            this.empty = true;
             this.recordedBlobs = [];
           })
           // alert('Too low Data to save');
@@ -129,6 +131,7 @@ export class RecorderComponent implements OnInit {
           if (event.data) {
             this.recordedBlobs = [];
             this.recordedBlobs.push(event.data);
+            this.empty = false;
           }
       }
     } catch (error) {
@@ -141,9 +144,7 @@ export class RecorderComponent implements OnInit {
       this.mediaRecorder.onstop = async (event: Event) => {
         this.stopTimer();
         this.stopStreaming();
-        if (this.recordedBlobs.length <= 0) {
-          return;
-        } else {
+        if (this.recordedBlobs.length > 0) {
           const videoBuffer = new Blob(this.recordedBlobs, {
             // type: 'video/webm'
             type: 'audio/wav'
@@ -177,7 +178,6 @@ export class RecorderComponent implements OnInit {
   }
 
   transform(value: any): string {
-    console.log('timer: ', value)
     let minutes: any = Math.floor(value / 60);
     value = value - minutes * 60;
     if (minutes < 10) minutes = '0' + minutes;
@@ -191,9 +191,9 @@ export class RecorderComponent implements OnInit {
     this.display = null;
   }
 
-  sendRecord(){
+  sendRecord() {
     let formData: FormData = new FormData();
     formData.append('voice', this.recordedBlobs[0])
-    this.recorderService.sendVoiceRecord(formData)
+    this.recorderService.sendVoiceRecord(formData).subscribe()
   }
 }
