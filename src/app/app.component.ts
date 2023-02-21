@@ -1,11 +1,6 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { BehaviorSubject, first, Observable, of, tap } from 'rxjs';
 
-export enum accessPermission {
-  DENIED = 'denied',
-  PROMPT = 'prompt',
-  GRANTED = 'granted'
-}
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -17,24 +12,11 @@ export class AppComponent implements OnInit {
 
   title = 'projectTest';
 
-  changedValue: string | boolean = '';
-  v$!: Observable<string | boolean>;
-  elem: BehaviorSubject<boolean> = new BehaviorSubject(false)
-
   constructor() { }
 
   async ngOnInit() {
 
   }
-
-  getHiddenValue(event: any) {
-    // this.changedValue = event
-    console.log(event);
-    
-    this.elem.next(event)
-    // this.changedValue = event
-  }
-
 
 }
 

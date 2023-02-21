@@ -22,9 +22,9 @@ export class RecorderComponent implements OnInit {
   @ViewChild('recordedSound') recordedSound!: ElementRef;
   @ViewChild('sound') sound!: ElementRef;
 
-  videoElement!: HTMLAudioElement;
-  // recordSound!: HTMLVideoElement;
-  recordSound!: HTMLAudioElement;
+  videoElement!: HTMLVideoElement;
+  recordSound!: HTMLVideoElement;
+  // recordSound!: HTMLAudioElement;
   mediaRecorder!: MediaRecorder;
   recordedBlobs: Blob[] = [];
   isRecording: boolean = false;
@@ -41,7 +41,7 @@ export class RecorderComponent implements OnInit {
 
   // Permissions navigator
   accessPermission!: BehaviorSubject<PermissionStatus>;
-
+  videoBuffer!: any
   constructor(
     private ngzone: NgZone,
     private recorderService: RecorderService
@@ -60,6 +60,8 @@ export class RecorderComponent implements OnInit {
         alert('you need to reset the permissions manually in order to use the recorder!')
       if (this.accessPermission.value.state == accessPermission.PROMPT || this.accessPermission.value.state == undefined) {
         console.log('!! access prompt !!');
+        // navigator permissions => see link
+        // https://stackoverflow.com/questions/52021331/convert-blob-to-wav-file-without-loosing-data-or-compressing
         this.streamed = await navigator.mediaDevices
           .getUserMedia({
             audio: true,
@@ -69,7 +71,10 @@ export class RecorderComponent implements OnInit {
       else {
         console.log('!! we are in !!');
         this.hidden = true;
-        let options: any = { mimeType: 'audio/webm' };
+        let options: any = {
+          type: 'audio/wav',
+          // checkForInactiveTracks: true,
+        };
         this.streamed = await navigator.mediaDevices
           .getUserMedia({
             audio: true,
@@ -81,7 +86,9 @@ export class RecorderComponent implements OnInit {
         // this.stream = this.streamed;
         this.videoElement.srcObject = this.streamed;
         try {
-          this.mediaRecorder = new MediaRecorder(this.streamed, options)
+          console.log('media recorder supprot wav format ? ', MediaRecorder.isTypeSupported("audio/wav"))
+          this.mediaRecorder = new MediaRecorder(this.streamed, { mimeType: 'audio/wav' })
+          console.log('media recorder: ', this.mediaRecorder)
         } catch (err) {
           console.log(err);
         }
@@ -145,11 +152,8 @@ export class RecorderComponent implements OnInit {
         this.stopTimer();
         this.stopStreaming();
         if (this.recordedBlobs.length > 0) {
-          const videoBuffer = new Blob(this.recordedBlobs, {
-            // type: 'video/webm'
-            type: 'audio/wav'
-          });
-          this.downloadUrl = window.URL.createObjectURL(videoBuffer); // you can download with <a> tag
+          this.videoBuffer = new Blob(this.recordedBlobs, { type: 'audio/wav' });
+          this.downloadUrl = window.URL.createObjectURL(this.videoBuffer); // you can download with <a> tag
           this.recordSound.src = this.downloadUrl;
         }
       };
@@ -193,7 +197,20 @@ export class RecorderComponent implements OnInit {
 
   sendRecord() {
     let formData: FormData = new FormData();
-    formData.append('voice', this.recordedBlobs[0])
-    this.recorderService.sendVoiceRecord(formData).subscribe()
+    formData.append('audio', this.videoBuffer)
+    this.getData(this.videoBuffer)
+    this.recorderService.sendVoiceRecord(formData).subscribe((res: any) => {
+      console.log(res);
+
+    })
+  }
+
+  getData(audioFile: any) {
+    var reader = new FileReader();
+    reader.onload = (event) => {
+      console.log(event.target?.result);
+      // console.log(event); 
+    };
+    reader.readAsDataURL(audioFile);
   }
 }

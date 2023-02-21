@@ -10,8 +10,7 @@ export class RecorderService {
     constructor(private httpClient: HttpClient) { }
 
     sendVoiceRecord(record: FormData): Observable<any> {
-        console.log('formData arrived: ', record.get('voice'))
-        return this.httpClient.post<any>('http://localhost:3010/effects', record).pipe(
+        return this.httpClient.post<any>('http://152.228.171.211:3021/effects', record).pipe(
             catchError((error) => this.handleError(error))
         );
     }
